@@ -23,10 +23,10 @@ spec:
     spec:      
       containers:
       - name: frontend
-        image: kiruthik067/todo-frontend:latest
+        image: kiruthik067/fd:latest
         imagePullPolicy: Always
         env:
           - name: REACT_APP_BACKEND_URL
-            value: "http://amanpathakdevops.study/api/tasks"
+            value: "/api/tasks"
         ports:
         - containerPort: 3000
