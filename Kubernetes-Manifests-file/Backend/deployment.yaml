@@ -21,8 +21,6 @@ spec:
       labels:
         role: api
     spec:
-      imagePullSecrets:
-      - name: ecr-registry-secret
       containers:
       - name: api
         image: kiruthik067/todo-backend:latest
