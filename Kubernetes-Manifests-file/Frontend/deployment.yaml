@@ -20,12 +20,10 @@ spec:
     metadata:
       labels:
         role: frontend
-    spec: 
-      imagePullSecrets:
-      - name: ecr-registry-secret
+    spec:      
       containers:
       - name: frontend
-        image: 407622020962.dkr.ecr.us-east-1.amazonaws.com/frontend:3
+        image: kiruthik067/todo-frontend:latest
         imagePullPolicy: Always
         env:
           - name: REACT_APP_BACKEND_URL
