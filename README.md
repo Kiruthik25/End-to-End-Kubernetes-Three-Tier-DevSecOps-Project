@@ -1,163 +1,176 @@
+# 🚀 Three-Tier Web Application on AWS EKS
 
-Welcome to the Three-Tier Web Application Deployment project! 🚀
+> A production-ready deployment of a **ReactJS + NodeJS + MongoDB** stack on **Kubernetes (EKS)** — with detailed configuration notes for networking, proxying, and environment management.
 
-This repository hosts the implementation of a Three-Tier Web App using ReactJS, NodeJS, and MongoDB, deployed on AWS EKS. The project covers a wide range of tools and practices for a robust and scalable DevOps setup.
+---
 
-his project uses Kubernetes (kind) with a React frontend and Node.js backend.
-The following configuration changes were made to ensure proper communication between the frontend and backend services.
+## 🏗️ Architecture Overview
 
-1. Using --address with kubectl port-forward
+```
+Browser
+  │
+  ▼
+Frontend Service (React)
+  │
+  ▼
+Ingress / Service Routing
+  │
+  ▼
+Backend Service (ClusterIP)
+  │
+  ▼
+Backend Pods (Node.js)
+  │
+  ▼
+MongoDB
+```
 
-By default, kubectl port-forward only binds to localhost.
+---
 
-Example:
+## ⚙️ Configuration Details
 
+### 1. 🔌 `kubectl port-forward` with `--address`
+
+By default, `kubectl port-forward` **only binds to `localhost`**, making it inaccessible from outside the machine.
+
+**Default (local only):**
+```bash
 kubectl port-forward deployment/frontend 3000:3000 -n three-tier
+# Accessible at: http://localhost:3000
+```
 
-This allows access only from the same machine:
-
-http://localhost:3000
-
-When the Kubernetes cluster runs on a remote server (e.g., EC2), external access is required.
-
-Use:
-
+**For remote access (e.g., EC2 instance):**
+```bash
 kubectl port-forward deployment/frontend 3000:3000 \
--n three-tier \
---address 0.0.0.0
+  -n three-tier \
+  --address 0.0.0.0
+# Accessible at: http://<EC2_PUBLIC_IP>:3000
+# Example:       http://13.60.52.154:3000
+```
 
-Now the application can be accessed using:
+**When to use `--address 0.0.0.0`:**
+- ✅ Kubernetes runs on a remote machine
+- ✅ You need browser access from your local machine
+- ✅ Temporary debugging sessions
 
-http://<EC2_PUBLIC_IP>:3000
+> ⚠️ **Note:** Port forwarding is intended for **testing/debugging only** — not for production deployments.
 
-Example:
+---
 
-http://13.60.52.154:3000
-When to Use --address
+### 2. ⚛️ React Proxy Configuration
 
-Use it when:
+During **development**, React can proxy API requests to the backend automatically.
 
-Kubernetes runs on a remote machine
+**Setup in `package.json`:**
+```json
+{
+  "proxy": "http://api:3500"
+}
+```
 
-You want to access the application from your local browser
-
-You are performing temporary debugging
-
-⚠️ Port forwarding is meant for testing/debugging, not production deployments.
-
-2. React Proxy Configuration
-
-During development, React can proxy API calls to the backend.
-
-Add this in package.json:
-
-"proxy": "http://api:3500"
-
-Then run:
-
+**Run the dev server:**
+```bash
 npm start
-Request Flow
+```
+
+**Request flow:**
+```
 Browser → React Dev Server → Proxy → Backend Service
 
-Example API request:
+/api/tasks  →  http://api:3500/api/tasks
+```
 
-/api/tasks
+| Mode | Proxy Works? |
+|------|-------------|
+| `npm start` / `react-scripts start` | ✅ Yes |
+| `npm run build` (static files) | ❌ No |
+| Docker / Nginx serving build | ❌ No |
 
-becomes
+> ℹ️ Once React is compiled to static files, the proxy configuration is no longer active.
 
-http://api:3500/api/tasks
-When Proxy Works
+---
 
-Proxy works only when running:
+### 3. 🌐 Environment Variable for Backend URL
 
-npm start
+The frontend reads the backend URL from a build-time environment variable.
 
-or
+**In your React code:**
+```javascript
+const apiUrl = process.env.REACT_APP_BACKEND_URL;
+```
 
-react-scripts start
-
-This means the React development server is active.
-
-When Proxy Does NOT Work
-
-Proxy does not work in production builds.
-
-Example production setups:
-
-Docker container
-
-Nginx serving static files
-
-npm run build
-
-When React is compiled:
-
-npm run build
-
-the application becomes static files, and the proxy feature is no longer available.
-
-3. Environment Variable for Backend URL
-
-The frontend reads the backend URL from an environment variable.
-
-Example React code:
-
-const apiUrl = process.env.REACT_APP_BACKEND_URL
-
-In Kubernetes Deployment:
-
+**In your Kubernetes Deployment manifest:**
+```yaml
 env:
   - name: REACT_APP_BACKEND_URL
     value: "/api/tasks"
+```
 
-This allows the frontend to call the backend through the same domain.
-
-Example request:
-
+This routes frontend requests through the same domain:
+```
 http://localhost:3000/api/tasks
-When Environment Variables Work
+```
 
-Environment variables are applied during build time.
+**Important — environment variables are applied at build time:**
 
-Example Dockerfile step:
+```dockerfile
+RUN npm run build  # Variable is embedded here
+```
 
-RUN npm run build
+> ⚠️ Changing the env variable in Kubernetes **after the image is built** has no effect.
+>
+> To apply changes, you must:
+> 1. Rebuild the Docker image
+> 2. Push the updated image to your registry
+> 3. Redeploy the Kubernetes deployment
 
-The variable value is embedded into the built React files.
+---
 
-When Environment Variables Do Not Change Behavior
+## 🧩 Recommended Kubernetes Architecture
 
-If the container image was already built, changing the environment variable in Kubernetes will not update the React application.
+| Component | Type | Notes |
+|-----------|------|-------|
+| Frontend | `Deployment` + `Service` | Exposed via Ingress |
+| Backend | `Deployment` + `ClusterIP` | Internal-only access |
+| MongoDB | `StatefulSet` + `ClusterIP` | Persistent volume recommended |
 
-In that case you must:
+**Internal communication:**
+```
+Frontend → http://api:3500/api/tasks
+```
 
-Rebuild the Docker image
+The backend is **not exposed externally** — it communicates with the frontend through the Kubernetes internal DNS.
 
-Push the updated image
+---
 
-Redeploy the Kubernetes deployment
+## 🛠️ Tech Stack
 
-Recommended Kubernetes Architecture
-Browser
-   ↓
-Frontend Service
-   ↓
-Ingress / Service Routing
-   ↓
-Backend Service (ClusterIP)
-   ↓
-Backend Pods
+| Layer | Technology |
+|-------|-----------|
+| Frontend | ReactJS |
+| Backend | Node.js |
+| Database | MongoDB |
+| Container Orchestration | Kubernetes (EKS / kind) |
+| Cloud | AWS |
 
-Backend should be exposed internally using:
+---
 
-ClusterIP
+## 📌 Quick Reference
 
-Frontend communicates with backend using:
+```bash
+# Port-forward frontend (local)
+kubectl port-forward deployment/frontend 3000:3000 -n three-tier
 
-/api/tasks
+# Port-forward frontend (remote EC2)
+kubectl port-forward deployment/frontend 3000:3000 -n three-tier --address 0.0.0.0
 
-or
+# Start React dev server (proxy active)
+npm start
 
-http://api:3500
+# Build for production (proxy inactive, env vars embedded)
+npm run build
+```
 
-within the Kubernetes cluster.
+---
+
+*Built with ❤️ using ReactJS · NodeJS · MongoDB · AWS EKS*
