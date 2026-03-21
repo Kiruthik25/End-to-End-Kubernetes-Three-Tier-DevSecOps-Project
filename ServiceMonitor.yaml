@@ -1,0 +1,18 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: api-monitor
+  namespace: three-tier
+  labels:
+    release: prometheus  
+spec:
+  selector:
+    matchLabels:
+      app: api   
+  namespaceSelector:
+    matchNames:
+      - three-tier
+  endpoints:
+    - port: http          # Need to match backend port name
+      path: /metrics      
+      interval: 15s
