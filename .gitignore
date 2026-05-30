@@ -1,0 +1,28 @@
+.env
+*.pem
+*.key
+kubeconfig
+terraform.tfvars
+secrets.yaml
+grafana-data/
+prometheus-data/
+
+
+node_modules/
+dist/
+.env
+*.log
+
+# Terraform
+terraform/.terraform/
+terraform/*.tfstate
+terraform/*.tfstate.backup
+terraform/.terraform.lock.hcl
+terraform/crash.log
+
+# Docker
+*.tar
+
+# OS
+.DS_Store
+Thumbs.db
